@@ -308,8 +308,9 @@ type ParametersLiteral struct {
 	LogN         int // Ring degree (power of 2)
 	Q            []uint64
 	P            []uint64
-	LogQ         []int   `json:",omitempty"`
-	LogP         []int   `json:",omitempty"`
+	LogQ         []int `json:",omitempty"`
+	LogP         []int `json:",omitempty"`
+	H            int
 	Sigma        float64 // Gaussian sampling variance
 	LogSlots     int
 	DefaultScale float64
@@ -353,7 +354,7 @@ func NewParameters(rlweParams rlwe.Parameters, logSlot int, defaultScale float64
 // NewParametersFromLiteral instantiate a set of CKKS parameters from a ParametersLiteral specification.
 // It returns the empty parameters Parameters{} and a non-nil error if the specified parameters are invalid.
 func NewParametersFromLiteral(pl ParametersLiteral) (Parameters, error) {
-	rlweParams, err := rlwe.NewParametersFromLiteral(rlwe.ParametersLiteral{LogN: pl.LogN, Q: pl.Q, P: pl.P, LogQ: pl.LogQ, LogP: pl.LogP, Sigma: pl.Sigma, RingType: pl.RingType})
+	rlweParams, err := rlwe.NewParametersFromLiteral(rlwe.ParametersLiteral{LogN: pl.LogN, Q: pl.Q, P: pl.P, LogQ: pl.LogQ, LogP: pl.LogP, H: pl.H, Sigma: pl.Sigma, RingType: pl.RingType})
 	if err != nil {
 		return Parameters{}, err
 	}
@@ -573,7 +574,7 @@ func (p Parameters) MarshalBinarySize() int {
 
 // MarshalJSON returns a JSON representation of this parameter set. See `Marshal` from the `encoding/json` package.
 func (p Parameters) MarshalJSON() ([]byte, error) {
-	return json.Marshal(ParametersLiteral{LogN: p.LogN(), Q: p.Q(), P: p.P(), Sigma: p.Sigma(), LogSlots: p.logSlots, DefaultScale: p.defaultScale, RingType: p.RingType()})
+	return json.Marshal(ParametersLiteral{LogN: p.LogN(), Q: p.Q(), P: p.P(), H: p.HammingWeight(), Sigma: p.Sigma(), LogSlots: p.logSlots, DefaultScale: p.defaultScale, RingType: p.RingType()})
 }
 
 // UnmarshalJSON reads a JSON representation of a parameter set into the receiver Parameter. See `Unmarshal` from the `encoding/json` package.
