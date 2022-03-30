@@ -95,7 +95,7 @@ func main() {
 		panic(err)
 	}
 
-	crs, err := utils.NewKeyedPRNG([]byte{'l', 'a', 't', 't', 'i', 'g', 'o'})
+	crs, err := utils.NewKeyedPRNG([]byte{'s', 'p', 'd', 'z'})
 	if err != nil {
 		panic(err)
 	}
@@ -258,7 +258,6 @@ func genparties(params bfv.Parameters, N int) []*party {
 	for i := range P {
 		pi := &party{}
 		pi.sk = bfv.NewKeyGenerator(params).GenSecretKey()
-
 		P[i] = pi
 	}
 

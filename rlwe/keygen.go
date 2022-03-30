@@ -16,6 +16,7 @@ type KeyGenerator interface {
 	GenSecretKeySparse(hw int) (sk *SecretKey)
 	GenPublicKey(sk *SecretKey) (pk *PublicKey)
 	GenKeyPair() (sk *SecretKey, pk *PublicKey)
+	GenKeyPairDis() (sk0, sk1, sk *SecretKey, pk *PublicKey)
 	GenKeyPairSparse(hw int) (sk *SecretKey, pk *PublicKey)
 	GenRelinearizationKey(sk *SecretKey, maxDegree int) (evk *RelinearizationKey)
 	GenSwitchingKey(skInput, skOutput *SecretKey) (newevakey *SwitchingKey)
@@ -113,6 +114,19 @@ func (keygen *keyGenerator) GenPublicKey(sk *SecretKey) (pk *PublicKey) {
 func (keygen *keyGenerator) GenKeyPair() (sk *SecretKey, pk *PublicKey) {
 	sk = keygen.GenSecretKey()
 	return sk, keygen.GenPublicKey(sk)
+}
+
+func (keygen *keyGenerator) GenKeyPairDis() (sk0, sk1, sk *SecretKey, pk *PublicKey) {
+	prng, err := utils.NewPRNG()
+	if err != nil {
+		panic(err)
+	}
+
+	ternarySamplerMontgomery := ring.NewTernarySampler(prng, keygen.params.RingQ(), 1.0/3, false)
+	sk0, sk1, sk = keygen.disGenSecretKeyFromSampler(ternarySamplerMontgomery)
+	pk = keygen.GenPublicKey(sk)
+
+	return
 }
 
 // GenKeyPairSparse generates a new SecretKey with exactly hw non zero coefficients [1/2, 0, 1/2].
@@ -286,15 +300,71 @@ func (keygen *keyGenerator) GenSwitchingKey(skInput, skOutput *SecretKey) (swk *
 
 // genSecretKeyFromSampler generates a new SecretKey sampled from the provided Sampler.
 func (keygen *keyGenerator) genSecretKeyFromSampler(sampler ring.Sampler) *SecretKey {
+	levelQ, levelP := keygen.params.QCount()-1, keygen.params.PCount()-1
 	ringQP := keygen.params.RingQP()
 	sk := new(SecretKey)
 	sk.Value = ringQP.NewPoly()
-	levelQ, levelP := keygen.params.QCount()-1, keygen.params.PCount()-1
 	sampler.Read(sk.Value.Q)
 	ringQP.ExtendBasisSmallNormAndCenter(sk.Value.Q, levelP, nil, sk.Value.P)
 	ringQP.NTTLvl(levelQ, levelP, sk.Value, sk.Value)
 	ringQP.MFormLvl(levelQ, levelP, sk.Value, sk.Value)
+	//
+	//sk0 := new(SecretKey)
+	//sk0.Value = ringQP.NewPoly()
+	//sampler.Read(sk0.Value.Q)
+	//ringQP.ExtendBasisSmallNormAndCenter(sk0.Value.Q, levelP, nil, sk0.Value.P)
+	//ringQP.NTTLvl(levelQ, levelP, sk0.Value, sk0.Value)
+	//ringQP.MFormLvl(levelQ, levelP, sk0.Value, sk0.Value)
+	//
+	//sk1 := new(SecretKey)
+	//sk1.Value = ringQP.NewPoly()
+	//sampler.Read(sk1.Value.Q)
+	//
+	//ringQP.ExtendBasisSmallNormAndCenter(sk1.Value.Q, levelP, nil, sk1.Value.P)
+	//fmt.Println(sk1.Value.Q.Coeffs[0][1])
+	//ringQP.AddNoModLvl(levelQ, levelP, sk.Value, sk0.Value, sk1.Value)
+	//fmt.Println(sk1.Value.Q.Coeffs[0][1])
 	return sk
+}
+
+// 分布式私钥生成
+func (keygen *keyGenerator) disGenSecretKeyFromSampler(sampler ring.Sampler) (*SecretKey, *SecretKey, *SecretKey) {
+	//ringQP := keygen.params.RingQP()
+	//sk := new(SecretKey)
+	//sk.Value = ringQP.NewPoly()
+	//levelQ, levelP := keygen.params.QCount()-1, keygen.params.PCount()-1
+	//sampler.Read(sk.Value.Q)
+	//ringQP.ExtendBasisSmallNormAndCenter(sk.Value.Q, levelP, nil, sk.Value.P)
+	//ringQP.NTTLvl(levelQ, levelP, sk.Value, sk.Value)
+	//ringQP.MFormLvl(levelQ, levelP, sk.Value, sk.Value)
+	//fmt.Println(sk.Value.Q)
+	levelQ, levelP := keygen.params.QCount()-1, keygen.params.PCount()-1
+
+	ringQP := keygen.params.RingQP()
+	sk0 := new(SecretKey)
+	sk0.Value = ringQP.NewPoly()
+	sampler.Read(sk0.Value.Q)
+	ringQP.ExtendBasisSmallNormAndCenter(sk0.Value.Q, levelP, nil, sk0.Value.P)
+	ringQP.NTTLvl(levelQ, levelP, sk0.Value, sk0.Value)
+	ringQP.MFormLvl(levelQ, levelP, sk0.Value, sk0.Value)
+
+	sk1 := new(SecretKey)
+	sk1.Value = ringQP.NewPoly()
+	sampler.Read(sk1.Value.Q)
+	ringQP.ExtendBasisSmallNormAndCenter(sk1.Value.Q, levelP, nil, sk1.Value.P)
+	ringQP.NTTLvl(levelQ, levelP, sk1.Value, sk1.Value)
+	ringQP.MFormLvl(levelQ, levelP, sk1.Value, sk1.Value)
+
+	sk := new(SecretKey)
+	sk.Value = ringQP.NewPoly()
+	sampler.Read(sk.Value.Q)
+	//ringQP.ExtendBasisSmallNormAndCenter(sk1.Value.Q, levelP, nil, sk1.Value.P)
+	ringQP.AddNoModLvl(levelQ, levelP, sk0.Value, sk1.Value, sk.Value)
+	//fmt.Println(sk1.Value.P.Coeffs[0][0])
+	//// ringQP.AddLvl(levelQ, levelP, sk.Value, sk0.Value, sk1.Value)
+	//fmt.Println(sk1.Value.P.Coeffs[0][0])
+
+	return sk0, sk1, sk
 }
 
 func (keygen *keyGenerator) genSwitchingKey(skIn *ring.Poly, skOut PolyQP, swk *SwitchingKey) {
