@@ -81,7 +81,7 @@ func main() {
 		check(err)
 	}
 
-	NGoRoutine := 1 // Default number of Go routines
+	NGoRoutine := 5 // Default number of Go routines
 	if len(os.Args[1:]) >= 2 {
 		NGoRoutine, err = strconv.Atoi(os.Args[2])
 		check(err)

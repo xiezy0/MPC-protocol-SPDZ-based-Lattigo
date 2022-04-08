@@ -66,23 +66,23 @@ func TestRing(t *testing.T) {
 		if testContext, err = genTestParams(defaultParam); err != nil {
 			t.Error(err)
 		}
-		testNTTConjugateInvariant(testContext, t)
-		testPRNG(testContext, t)
+		//testNTTConjugateInvariant(testContext, t)
+		//testPRNG(testContext, t)
 		testGenerateNTTPrimes(testContext, t)
-		testImportExportPolyString(testContext, t)
-		testDivFloorByLastModulusMany(testContext, t)
-		testDivRoundByLastModulusMany(testContext, t)
-		testMarshalBinary(testContext, t)
-		testUniformSampler(testContext, t)
-		testGaussianSampler(testContext, t)
-		testTernarySampler(testContext, t)
-		testGaloisShift(testContext, t)
-		testModularReduction(testContext, t)
-		testMForm(testContext, t)
-		testMulScalarBigint(testContext, t)
-		testExtendBasis(testContext, t)
-		testScaling(testContext, t)
-		testMultByMonomial(testContext, t)
+		//testImportExportPolyString(testContext, t)
+		//testDivFloorByLastModulusMany(testContext, t)
+		//testDivRoundByLastModulusMany(testContext, t)
+		//testMarshalBinary(testContext, t)
+		//testUniformSampler(testContext, t)
+		//testGaussianSampler(testContext, t)
+		//testTernarySampler(testContext, t)
+		//testGaloisShift(testContext, t)
+		//testModularReduction(testContext, t)
+		//testMForm(testContext, t)
+		//testMulScalarBigint(testContext, t)
+		//testExtendBasis(testContext, t)
+		//testScaling(testContext, t)
+		//testMultByMonomial(testContext, t)
 	}
 }
 
@@ -201,6 +201,7 @@ func testGenerateNTTPrimes(testContext *testParams, t *testing.T) {
 	t.Run(testString("GenerateNTTPrimes/", testContext.ringQ), func(t *testing.T) {
 
 		primes := GenerateNTTPrimes(55, testContext.ringQ.N<<1, len(testContext.ringQ.Modulus))
+		fmt.Println(primes)
 
 		for _, q := range primes {
 			require.Equal(t, q&uint64((testContext.ringQ.N<<1)-1), uint64(1))
