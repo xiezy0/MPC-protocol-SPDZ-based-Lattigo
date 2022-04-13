@@ -9,7 +9,7 @@ import (
 func encdec() {
 	// 参数选择
 	paramDef := bfv.PN13QP218
-	paramDef.T = 0x3ee0001
+	paramDef.T = 36028797014704129
 	params, err := bfv.NewParametersFromLiteral(paramDef)
 	if err != nil {
 		panic(err)
@@ -115,6 +115,6 @@ func encdecdis() {
 }
 
 func main() {
-	encdecdis()
-	//encdec()
+	//encdecdis()
+	encdec()
 }

@@ -1,7 +1,8 @@
 package main
 
 import (
-	"crypto/rand"
+	"bytes"
+	"encoding/binary"
 	"fmt"
 	"github.com/ldsec/lattigo/v2/bfv"
 	"github.com/ldsec/lattigo/v2/dbfv"
@@ -12,6 +13,7 @@ import (
 	"math/big"
 	"sync"
 	"time"
+	"unsafe"
 )
 
 type party struct {
@@ -37,9 +39,8 @@ type multTask struct {
 func dbfvTest() {
 	N := 2
 	// Creating encryption parameters from a default params with logN=14, logQP=438 with a plaintext modulus T=65537
-	paramsDef := bfv.PN14QP438
-	// 36028797014704129
-	paramsDef.T = 36028797014704129
+	paramsDef := bfv.PN15QP827pq
+	paramsDef.T = 576460752260694017
 	params, err := bfv.NewParametersFromLiteral(paramsDef)
 	if err != nil {
 		panic(err)
@@ -72,8 +73,8 @@ func dbfvTest() {
 	ptres := bfv.NewPlaintext(params)
 	decryptor.Decrypt(encOut, ptres)
 	res := encoder.DecodeUintNew(ptres)
-	fmt.Println("eva result", res[0])
-	fmt.Println("right result", expRes[0])
+	fmt.Println("eva result", res[1])
+	fmt.Println("right result", expRes[1])
 }
 
 func genparties(params bfv.Parameters, N int) []*party {
@@ -93,12 +94,43 @@ func genparties(params bfv.Parameters, N int) []*party {
 func genInputs(params bfv.Parameters, P []*party) (expRes []uint64) {
 	expRes = make([]uint64, params.N())
 	expRes[0] = 1
+	expRes[1] = 1
 	for _, pi := range P {
 		pi.input = make([]uint64, params.N())
-		pi.input[0] = 100000
+		pi.input[0] = 536870911
+		//102232259
+		pi.input[1] = 536870911
 		expRes[0] *= pi.input[0]
+		expRes[1] *= pi.input[1]
 	}
 	return
+}
+
+func BytesToString(data []byte) string {
+	return *(*string)(unsafe.Pointer(&data))
+}
+
+func StringToBytes(data string) []byte {
+	return *(*[]byte)(unsafe.Pointer(&data))
+}
+
+func encodeStringUint(plaintext string, params bfv.Parameters) []uint64 {
+	enplaintext := make([]uint64, params.N())
+	byplaintext := StringToBytes(plaintext)
+	for i, elem := range byplaintext {
+		enplaintext[i] = uint64(elem)
+	}
+	return enplaintext
+}
+
+func decodeUintString(deplaintext []uint64, params bfv.Parameters) (plaintext string) {
+	buf := bytes.NewBuffer(make([]byte, 0))
+
+	for _, elem := range deplaintext {
+		binary.Write(buf, binary.BigEndian, uint64(elem))
+	}
+
+	return BytesToString(buf.Bytes())
 }
 
 func ckgphase(params bfv.Parameters, crs utils.PRNG, P []*party) *rlwe.PublicKey {
@@ -263,15 +295,20 @@ func pcksPhase(params bfv.Parameters, tpk *rlwe.PublicKey, encRes *bfv.Ciphertex
 }
 
 func getPrime() (p *big.Int) {
-	p, _ = rand.Prime(rand.Reader, 55)
-	fmt.Println(p)
-	primes := ring.GenerateNTTPrimes(55, 4096, 56)
-	fmt.Println(primes)
+	paramsDef := bfv.PN15QP827pq
+	primes := ring.GenerateNTTPrimes(59, 65536, 56)
+	for _, prime := range primes {
+		paramsDef.T = prime
+		_, err := bfv.NewParametersFromLiteral(paramsDef)
+		if err == nil {
+			fmt.Println(prime)
+		}
+	}
 	return
 }
 
+//576460752301785089
 func main() {
 	dbfvTest()
 
-	//getPrime()
 }
