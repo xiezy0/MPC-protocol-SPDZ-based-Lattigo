@@ -66,8 +66,9 @@ func dbfvTest() {
 	rlk := rkgphase(params, crs, P)
 	// 加密
 	encInputs := encPhase(params, P, pk, encoder)
-	//
+	// 密文计算
 	encRes := evalPhase(params, encInputs, rlk)
+	// 密钥转换
 	encOut := pcksPhase(params, tpk, encRes, P)
 	decryptor := bfv.NewDecryptor(params, tsk)
 	ptres := bfv.NewPlaintext(params)
@@ -291,7 +292,6 @@ func pcksPhase(params bfv.Parameters, tpk *rlwe.PublicKey, encRes *bfv.Ciphertex
 	pcks.KeySwitch(pcksCombined, encRes.Ciphertext, encOut.Ciphertext)
 
 	return
-
 }
 
 func getPrime() (p *big.Int) {

@@ -6,12 +6,12 @@ import (
 	"math/big"
 )
 
-func rns(num int, encodeTriple *big.Int) (res *big.Int) {
+func rns(num int, encodeTriple *big.Int) (res *big.Int, residuSlice []*big.Int) {
 	n := encodeTriple.BitLen()
 	primeBit := evaPrimesBit(num)
 	primeNumber := (n + primeBit - 1) * 2 / primeBit
 	primeSlice, primeb := genPrimeSlice(primeNumber, primeBit)
-	residuSlice := genResiduSlice(primeSlice, encodeTriple)
+	residuSlice = genResiduSlice(primeSlice, encodeTriple)
 	res = crt(primeSlice, residuSlice, primeb)
 	return
 }
