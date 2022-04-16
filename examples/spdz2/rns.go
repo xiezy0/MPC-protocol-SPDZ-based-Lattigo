@@ -6,53 +6,74 @@ import (
 	"math/big"
 )
 
-func rns(num int, encodeTriple *big.Int) (res *big.Int, residuSlice []*big.Int) {
-	n := encodeTriple.BitLen()
-	primeBit := evaPrimesBit(num)
-	primeNumber := (n + primeBit - 1) * 2 / primeBit
-	primeSlice, primeb := genPrimeSlice(primeNumber, primeBit)
-	residuSlice = genResiduSlice(primeSlice, encodeTriple)
-	res = crt(primeSlice, residuSlice, primeb)
+// SPDZ based RNS high interface
+
+// high interface in RNS domin
+type RnsHigh interface {
+	rns(encodeTriple *big.Int) (res *big.Int, residuSlice []*big.Int)
+	rnsAddTest(encodeTriple0, encodeTriple1 *big.Int) (res *big.Int)
+	rnsMultTest(encodeTriple0, encodeTriple1 *big.Int) (res *big.Int)
+}
+
+// low interface in RNS domin
+type RnsLow interface {
+	RnsHigh
+	genResiduSlice(encodeTriple *big.Int) (residuSlice []*big.Int)
+	rnsAdd(residuSlice0 []*big.Int, residuSlice1 []*big.Int) (residuSliceAdd []*big.Int)
+	rnsMult(residuSlice0 []*big.Int, residuSlice1 []*big.Int) (residuSliceMult []*big.Int)
+	crt(residuSlice []*big.Int) (res *big.Int)
+}
+
+// global params of RNS params
+type rnsParams struct {
+	primeBit, primeNum int
+	primeb             *big.Int
+	primeSlice         []*big.Int
+}
+
+func rnsInit(num int, encodeTriples []*big.Int) (params rnsParams) {
+	primeBit, primeNum := genPrimeParams(num, encodeTriples)
+	primeSlice, primeb := genPrimeSlice(primeNum, primeBit)
+	params = rnsParams{primeBit, primeNum, primeb, primeSlice}
 	return
 }
 
-func rnsAddTest(num int, encodeTriple0 *big.Int, encodeTriple1 *big.Int) (res *big.Int) {
-	n := encodeTriple0.BitLen()
-	primeBit := evaPrimesBit(num)
-	primeNumber := (n + primeBit - 1) * 2 / primeBit
-	primeSlice, primeb := genPrimeSlice(primeNumber, primeBit)
-	residuSlice0 := genResiduSlice(primeSlice, encodeTriple0)
-	residuSlice1 := genResiduSlice(primeSlice, encodeTriple1)
-	residuSliceAdd := rnsAdd(residuSlice0, residuSlice1, primeSlice)
-	res = crt(primeSlice, residuSliceAdd, primeb)
-	//fmt.Println("primeslice::", primeSlice)
-	//fmt.Println("primeb::", primeb)
-	//fmt.Println("residuslice::", residuSlice)
-	//fmt.Println("eva::", res)
+func (params *rnsParams) rns(encodeTriple *big.Int) (res *big.Int, residuSlice []*big.Int) {
+	residuSlice = params.genResiduSlice(encodeTriple)
+	res = params.crt(residuSlice)
 	return
 }
 
-func rnsMultTest(num int, encodeTriple0 *big.Int, encodeTriple1 *big.Int) (res *big.Int) {
-	n := encodeTriple0.BitLen()
-	primeBit := evaPrimesBit(num)
-	primeNumber := (n + primeBit - 1) * 2 / primeBit
-	primeSlice, primeb := genPrimeSlice(primeNumber, primeBit)
-	residuSlice0 := genResiduSlice(primeSlice, encodeTriple0)
-	residuSlice1 := genResiduSlice(primeSlice, encodeTriple1)
-	residuSliceAdd := rnsMult(residuSlice0, residuSlice1, primeSlice)
-	res = crt(primeSlice, residuSliceAdd, primeb)
-	//fmt.Println("primeslice::", primeSlice)
-	//fmt.Println("pri::", primeb)
-	////fmt.Println("residuslice::", residuSlice)
-	//fmt.Println("eva::", res)
+func (params *rnsParams) rnsAddTest(encodeTriple0, encodeTriple1 *big.Int) (res *big.Int) {
+	residuSlice0 := params.genResiduSlice(encodeTriple0)
+	residuSlice1 := params.genResiduSlice(encodeTriple1)
+	residuSliceAdd := params.rnsAdd(residuSlice0, residuSlice1)
+	res = params.crt(residuSliceAdd)
+	return
+}
+
+func (params *rnsParams) rnsMultTest(encodeTriple0, encodeTriple1 *big.Int) (res *big.Int) {
+	residuSlice0 := params.genResiduSlice(encodeTriple0)
+	residuSlice1 := params.genResiduSlice(encodeTriple1)
+	residuSliceAdd := params.rnsMult(residuSlice0, residuSlice1)
+	res = params.crt(residuSliceAdd)
+	return
+}
+
+// 计算剩余项
+func (params *rnsParams) genResiduSlice(encodeTriple *big.Int) (residuSlice []*big.Int) {
+	residuSlice = make([]*big.Int, 0)
+	for _, prime := range params.primeSlice {
+		residuSlice = append(residuSlice, new(big.Int).Mod(encodeTriple, prime))
+	}
 	return
 }
 
 // 计算rns域中的加法
-func rnsAdd(residuSlice0 []*big.Int, residuSlice1 []*big.Int, primeSlice []*big.Int) (residuSliceAdd []*big.Int) {
+func (params *rnsParams) rnsAdd(residuSlice0 []*big.Int, residuSlice1 []*big.Int) (residuSliceAdd []*big.Int) {
 	residuSliceAdd = make([]*big.Int, 0)
 	add := new(big.Int)
-	for i, prime := range primeSlice {
+	for i, prime := range params.primeSlice {
 		add.Add(residuSlice0[i], residuSlice1[i])
 		residuSliceAdd = append(residuSliceAdd, new(big.Int).Mod(add, prime))
 	}
@@ -60,10 +81,10 @@ func rnsAdd(residuSlice0 []*big.Int, residuSlice1 []*big.Int, primeSlice []*big.
 }
 
 // 计算rns域中的乘法
-func rnsMult(residuSlice0 []*big.Int, residuSlice1 []*big.Int, primeSlice []*big.Int) (residuSliceMult []*big.Int) {
+func (params *rnsParams) rnsMult(residuSlice0 []*big.Int, residuSlice1 []*big.Int) (residuSliceMult []*big.Int) {
 	residuSliceMult = make([]*big.Int, 0)
 	mul := new(big.Int)
-	for i, prime := range primeSlice {
+	for i, prime := range params.primeSlice {
 		mul.Mul(residuSlice0[i], residuSlice1[i])
 		residuSliceMult = append(residuSliceMult, new(big.Int).Mod(mul, prime))
 	}
@@ -71,38 +92,40 @@ func rnsMult(residuSlice0 []*big.Int, residuSlice1 []*big.Int, primeSlice []*big
 }
 
 // 中国剩余定理解密
-func crt(primesSlice []*big.Int, residuSlice []*big.Int, primeb *big.Int) (res *big.Int) {
+func (params *rnsParams) crt(residuSlice []*big.Int) (res *big.Int) {
 	res = new(big.Int).SetInt64(0)
 	primesSliceDiv := make([]*big.Int, 0)
 	primesSliceDivInv := make([]*big.Int, 0)
 	xj := make([]*big.Int, 0)
 	mmi := new(big.Int)
-	for _, prime := range primesSlice {
-		primesSliceDiv = append(primesSliceDiv, new(big.Int).Div(primeb, prime))
+	for _, prime := range params.primeSlice {
+		primesSliceDiv = append(primesSliceDiv, new(big.Int).Div(params.primeb, prime))
 	}
-	// fmt.Println("primeslicediv::", primesSliceDiv)
-	for i, prime := range primesSlice {
+	for i, prime := range params.primeSlice {
 		primesSliceDivInv = append(primesSliceDivInv, new(big.Int).ModInverse(primesSliceDiv[i], prime))
 	}
-	// fmt.Println("primesSliceDivInv::", primesSliceDivInv)
 	for i, primediv := range primesSliceDiv {
 		mmi.Mul(primediv, primesSliceDivInv[i])
-		mmi.Mod(mmi, primeb)
+		mmi.Mod(mmi, params.primeb)
 		xj = append(xj, new(big.Int).Mul(mmi, residuSlice[i]))
 	}
 	for _, xjj := range xj {
 		res.Add(res, xjj)
-		res.Mod(res, primeb)
+		res.Mod(res, params.primeb)
 	}
 	return
 }
 
-// 计算剩余项
-func genResiduSlice(primeSlice []*big.Int, encodeTriple *big.Int) (residuSlice []*big.Int) {
-	residuSlice = make([]*big.Int, 0)
-	for _, prime := range primeSlice {
-		residuSlice = append(residuSlice, new(big.Int).Mod(encodeTriple, prime))
+// TODO:: 改用每一方自己计算Bitlen
+func genPrimeParams(num int, encodeTriples []*big.Int) (primeBit, primeNum int) {
+	n := 0
+	for _, triple := range encodeTriples {
+		if triple.BitLen() > n {
+			n = triple.BitLen()
+		}
 	}
+	primeBit = evaPrimesBit(num)
+	primeNum = (n + primeBit - 1) * 2 / primeBit
 	return
 }
 

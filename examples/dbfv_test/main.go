@@ -67,7 +67,7 @@ func dbfvTest() {
 	// 加密
 	encInputs := encPhase(params, P, pk, encoder)
 	// 密文计算
-	encRes := evalPhase(params, encInputs, rlk)
+	encRes := eval1Phase(params, 1, encInputs, rlk)
 	// 密钥转换
 	encOut := pcksPhase(params, tpk, encRes, P)
 	decryptor := bfv.NewDecryptor(params, tsk)

@@ -34,6 +34,7 @@ type Dsohomo interface {
 	bfvAdd(Ciphertext0 *bfv.Ciphertext, Ciphertext1 *bfv.Ciphertext) (CiphertextAdd *bfv.Ciphertext)
 	bfvMult(Ciphertext0 *bfv.Ciphertext, Ciphertext1 *bfv.Ciphertext) (CiphertextMult *bfv.Ciphertext)
 	bfvDDec(Ciphertext *bfv.Ciphertext) (output []uint64)
+	keyswitch(ciphertextOld *bfv.Ciphertext, P []*party) (ciphertextNew *bfv.Ciphertext)
 }
 
 func dkeyGen(num int) (publicParams PublicParams, P []*party) {
@@ -112,6 +113,26 @@ func (params *PublicParams) bfvDDec(Ciphertext *bfv.Ciphertext) (output []uint64
 	return
 }
 
+// TODO: 开多个协程改写
+func (params *PublicParams) keyswitch(ciphertextOld *bfv.Ciphertext, P []*party) (ciphertextNew *bfv.Ciphertext) {
+	// Collective key switching from the collective secret key to
+	// the target public key
+	pcks := dbfv.NewPCKSProtocol(params.params, 3.19)
+	for _, pi := range P {
+		pi.pcksShare = pcks.AllocateShareBFV()
+	}
+	for _, pi := range P {
+		pcks.GenShare(pi.sk, params.tpk, ciphertextOld.Ciphertext, pi.pcksShare)
+	}
+	pcksCombined := pcks.AllocateShareBFV()
+	ciphertextNew = bfv.NewCiphertext(params.params, 1)
+	for _, pi := range P {
+		pcks.AggregateShares(pi.pcksShare, pcksCombined, pcksCombined)
+	}
+	pcks.KeySwitch(pcksCombined, ciphertextOld.Ciphertext, ciphertextNew.Ciphertext)
+	return
+}
+
 func ckgphase(params bfv.Parameters, crs utils.PRNG, P []*party) *rlwe.PublicKey {
 
 	ckg := dbfv.NewCKGProtocol(params) // Public key generation
@@ -163,29 +184,4 @@ func rkgphase(params bfv.Parameters, crs utils.PRNG, P []*party) *rlwe.Relineari
 	rkg.GenRelinearizationKey(rkgCombined1, rkgCombined2, rlk)
 
 	return rlk
-}
-
-// TODO: 开多个协程改写
-func pcksPhase(params bfv.Parameters, tpk *rlwe.PublicKey, encRes *bfv.Ciphertext, P []*party) (encOut *bfv.Ciphertext) {
-	// Collective key switching from the collective secret key to
-	// the target public key
-
-	pcks := dbfv.NewPCKSProtocol(params, 3.19)
-
-	for _, pi := range P {
-		pi.pcksShare = pcks.AllocateShareBFV()
-	}
-
-	for _, pi := range P {
-		pcks.GenShare(pi.sk, tpk, encRes.Ciphertext, pi.pcksShare)
-	}
-
-	pcksCombined := pcks.AllocateShareBFV()
-	encOut = bfv.NewCiphertext(params, 1)
-	for _, pi := range P {
-		pcks.AggregateShares(pi.pcksShare, pcksCombined, pcksCombined)
-	}
-	pcks.KeySwitch(pcksCombined, encRes.Ciphertext, encOut.Ciphertext)
-
-	return
 }
