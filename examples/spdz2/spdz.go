@@ -3,12 +3,91 @@ package spdz2
 import (
 	"crypto/rand"
 	"fmt"
+	"github.com/ldsec/lattigo/v2/bfv"
 	"math/big"
 	"strconv"
+	"sync"
+	"sync/atomic"
 )
 
-func spdz() {
+var ()
 
+// the public params of SPDZ
+type spdzParams struct {
+	rnsparams    rnsParams
+	publicparams PublicParams
+	fprime       *big.Int
+}
+
+func spdzInit(num int, security int) (params rnsParams, fprime *big.Int) {
+	params = rnspdzInit(num, 64)
+	fprime, _ = rand.Prime(rand.Reader, 64)
+	return
+}
+
+func GenTriple(num int) {
+	skChan := make(chan *party, num)
+	rnsparams, fprime := spdzInit(num, 64)
+	publicparams, P := dkeyGen(num)
+	spdzparams := spdzParams{rnsparams, publicparams, fprime}
+	wgmain, mutex, encch, queuelen := encTxInit(num)
+	for i := 0; i < num; i++ {
+		skChan <- P[i]
+	}
+	// num goroutine <---> num players
+	for i := 0; i < num; i++ {
+		go func(params spdzParams, Id int, convSyncChan0 <-chan *party) {
+			trilpa, _ := rand.Int(rand.Reader, fprime)
+			//trilpb, _ := rand.Int(rand.Reader, fprime)
+			psk := <-convSyncChan0
+			fmt.Println(psk)
+			residuSliceA := encodeBigUintSlice(params.rnsparams.genResiduSlice(trilpa))
+			//residuSliceB := encodeBigUintSlice(params.rnsparams.genResiduSlice(trilpb))
+			ciphertext0 := publicparams.bfvEnc(residuSliceA)
+			//ciphertext1 := publicparams.bfvEnc(residuSliceB)
+			for j := 0; j < num; j++ {
+				ciphertext0Slice := encTx(&wgmain, &mutex, encch, Id, num, queuelen, ciphertext0)
+				fmt.Println(ciphertext0Slice)
+			}
+		}(spdzparams, i, skChan)
+	}
+	close(skChan)
+	wgmain.Wait()
+}
+
+func encTxInit(players int) (wgmain sync.WaitGroup, mutex sync.Mutex, ch chan *bfv.Ciphertext, queuelen uint64) {
+	wgmain = sync.WaitGroup{}
+	wgmain.Add(players)
+	mutex = sync.Mutex{}
+	ch = make(chan *bfv.Ciphertext, players)
+	queuelen = uint64(0)
+	return
+}
+
+func encTx(wgmain *sync.WaitGroup, mutex *sync.Mutex, ch chan *bfv.Ciphertext, num int, players int, queuelen uint64, enc *bfv.Ciphertext) (m []*bfv.Ciphertext) {
+	m = make([]*bfv.Ciphertext, players)
+	wg := sync.WaitGroup{}
+	wg.Add(players)
+	ch <- enc
+LABEL:
+	mutex.Lock()
+	if atomic.StoreUint64(&queuelen, uint64(len(ch))); atomic.CompareAndSwapUint64(&queuelen, uint64(players), 0) {
+		for j := 0; j < players; j++ {
+			m[j] = <-ch
+		}
+		fmt.Println("goroutine", num, ":", m)
+		wg.Done()
+		for j := 0; j < players; j++ {
+			ch <- m[j]
+		}
+		wgmain.Done()
+		mutex.Unlock()
+	} else {
+		mutex.Unlock()
+		goto LABEL
+	}
+	wg.Wait()
+	return
 }
 
 func genTriple(num int) {

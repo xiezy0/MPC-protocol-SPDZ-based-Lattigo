@@ -6,13 +6,16 @@ import (
 	"math/big"
 )
 
-// SPDZ based RNS high interface
-
 // high interface in RNS domin
 type RnsHigh interface {
 	rns(encodeTriple *big.Int) (res *big.Int, residuSlice []*big.Int)
 	rnsAddTest(encodeTriple0, encodeTriple1 *big.Int) (res *big.Int)
 	rnsMultTest(encodeTriple0, encodeTriple1 *big.Int) (res *big.Int)
+}
+
+// SPDZ based RNS high interface
+type RnspdzHigh interface {
+	RnsHigh
 }
 
 // low interface in RNS domin
@@ -33,6 +36,13 @@ type rnsParams struct {
 
 func rnsInit(num int, encodeTriples []*big.Int) (params rnsParams) {
 	primeBit, primeNum := genPrimeParams(num, encodeTriples)
+	primeSlice, primeb := genPrimeSlice(primeNum, primeBit)
+	params = rnsParams{primeBit, primeNum, primeb, primeSlice}
+	return
+}
+
+func rnspdzInit(num int, security int) (params rnsParams) {
+	primeBit, primeNum := genPrimeParamse(num, security)
 	primeSlice, primeb := genPrimeSlice(primeNum, primeBit)
 	params = rnsParams{primeBit, primeNum, primeb, primeSlice}
 	return
@@ -113,6 +123,12 @@ func (params *rnsParams) crt(residuSlice []*big.Int) (res *big.Int) {
 		res.Add(res, xjj)
 		res.Mod(res, params.primeb)
 	}
+	return
+}
+
+func genPrimeParamse(num int, sebit int) (primeBit, primeNum int) {
+	primeBit = evaPrimesBit(num)
+	primeNum = (sebit + primeBit - 1) * 2 / primeBit
 	return
 }
 
