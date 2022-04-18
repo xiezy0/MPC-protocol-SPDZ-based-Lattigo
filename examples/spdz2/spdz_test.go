@@ -49,7 +49,7 @@ func TestSpdz(t *testing.T) {
 		skChan := make(chan *party, 3)
 		rnsparams, fprime := spdzInit(3, 32)
 		publicparams, P := dkeyGen(3)
-		wgmain, _, _, _ := encTxInit(3)
+		wgmain, _ := encTxInit(3)
 		mutex := sync.Mutex{}
 		//trilpa, _ := rand.Int(rand.Reader, fprime)
 		//ciphertexta := publicparams.bfvEnc(encodeBigUintSlice(rnsparams.genResiduSlice(trilpa)))
