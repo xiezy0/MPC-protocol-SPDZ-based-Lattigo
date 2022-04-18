@@ -11,6 +11,7 @@ func TestDhomo(t *testing.T) {
 		ciphertext0 := publicparams.bfvEnc([]uint64{2, 4, 6})
 		ciphertext1 := publicparams.bfvEnc([]uint64{2, 4, 6})
 		ciphertext2 := publicparams.bfvAdd(ciphertext0, ciphertext1)
+		ciphertext2 = publicparams.bfvSub(ciphertext2, ciphertext1)
 		ciphertext3 := publicparams.bfvMult(ciphertext0, ciphertext1)
 		ciphertext2New := publicparams.keyswitch(ciphertext2, P)
 		ciphertext3New := publicparams.keyswitch(ciphertext3, P)

@@ -1,53 +1,16 @@
 package spdz2
 
 import (
+	"fmt"
 	"github.com/ldsec/lattigo/v2/bfv"
 	"github.com/ldsec/lattigo/v2/dbfv"
 	"github.com/ldsec/lattigo/v2/drlwe"
 	"github.com/ldsec/lattigo/v2/rlwe"
 	"github.com/ldsec/lattigo/v2/utils"
 	"sync"
-	"time"
 )
 
-type multTask struct {
-	wg              *sync.WaitGroup
-	op1             *bfv.Ciphertext
-	op2             *bfv.Ciphertext
-	res             *bfv.Ciphertext
-	elapsedmultTask time.Duration
-}
-
-type party struct {
-	sk         *rlwe.SecretKey
-	pk         *rlwe.PublicKey
-	rlkEphemSk *rlwe.SecretKey
-
-	ckgShare    *drlwe.CKGShare
-	rkgShareOne *drlwe.RKGShare
-	rkgShareTwo *drlwe.RKGShare
-	pcksShare   *drlwe.PCKSShare
-
-	input []uint64
-}
-
-type PublicParams struct {
-	params  bfv.Parameters
-	encoder bfv.Encoder
-	tsk     *rlwe.SecretKey
-	tpk, pk *rlwe.PublicKey
-	rlk     *rlwe.RelinearizationKey
-}
-
-type Dsohomo interface {
-	bfvEnc(input []uint64) (Ciphertext *bfv.Ciphertext)
-	bfvAdd(Ciphertext0 *bfv.Ciphertext, Ciphertext1 *bfv.Ciphertext) (CiphertextAdd *bfv.Ciphertext)
-	bfvMult(Ciphertext0 *bfv.Ciphertext, Ciphertext1 *bfv.Ciphertext) (CiphertextMult *bfv.Ciphertext)
-	bfvDDec(Ciphertext *bfv.Ciphertext) (output []uint64)
-	keyswitch(ciphertextOld *bfv.Ciphertext, P []*party) (ciphertextNew *bfv.Ciphertext)
-}
-
-func dkeyGen(num int) (publicParams PublicParams, P []*party) {
+func dkeyGenNew(num int) (publicParams PublicParams, P [][]party) {
 	N := num
 	// Creating encryption parameters from a default params with logN=14, logQP=438 with a plaintext modulus T=65537
 	paramsDef := bfv.PN15QP827pq
@@ -63,33 +26,42 @@ func dkeyGen(num int) (publicParams PublicParams, P []*party) {
 	encoder := bfv.NewEncoder(params)
 	// 全局最后加解密的公私钥
 	tsk, tpk := bfv.NewKeyGenerator(params).GenKeyPair()
-	// Create each party, and allocate the memory for all the shares that the protocols will need
-	// 给每个计算方创建一个私钥
-	P = genparties(params, N)
-	// 全局公钥创建 并共享公钥
-	pk := ckgphase(params, crs, P)
-	// 全局重线性化密钥创建
-	rlk := rkgphase(params, crs, P)
+	pk := new(rlwe.PublicKey)
+	rlk := new(rlwe.RelinearizationKey)
+	P = make([][]party, 0)
 
+	// Create each party, and allocate the memory for all the shares that the protocols will need
+	for i := 0; i < num; i++ {
+		// 给每个计算方创建一个私钥
+		Pi := make([]party, 0)
+		Pi = genpartiesru(params, N)
+		// 全局公钥创建 并共享公钥
+
+		//pk = ckgphaseru(params, crs, Pi)
+		// 全局重线性化密钥创建
+		rlk = rkgphaseru(params, crs, Pi)
+		P = append(P, Pi)
+	}
+	fmt.Println(P)
 	publicParams = PublicParams{params, encoder, tsk, tpk, pk, rlk}
 	return
 }
 
 // TODO: 开多个协程改写
 // 创建自己的私钥
-func genparties(params bfv.Parameters, N int) []*party {
+func genpartiesru(params bfv.Parameters, N int) []party {
 	// Create each party, and allocate the memory for all the shares that the protocols will need
-	P := make([]*party, N)
+	P := make([]party, N)
 	for i := range P {
 		pi := party{}
 		pi.sk = bfv.NewKeyGenerator(params).GenSecretKey()
-		P[i] = &pi
+		P[i] = pi
 	}
 	return P
 }
 
 // 单个计算方加密元素
-func (params *PublicParams) bfvEnc(input []uint64) (Ciphertext *bfv.Ciphertext) {
+func (params *PublicParams) bfvEncru(input []uint64) (Ciphertext *bfv.Ciphertext) {
 	Ciphertext = bfv.NewCiphertext(params.params, 1)
 	encryptor := bfv.NewEncryptor(params.params, params.pk)
 	plaintext := bfv.NewPlaintext(params.params)
@@ -99,7 +71,7 @@ func (params *PublicParams) bfvEnc(input []uint64) (Ciphertext *bfv.Ciphertext) 
 }
 
 // 同态加法
-func (params *PublicParams) bfvAdd(Ciphertext0 *bfv.Ciphertext, Ciphertext1 *bfv.Ciphertext) (CiphertextAdd *bfv.Ciphertext) {
+func (params *PublicParams) bfvAddru(Ciphertext0 *bfv.Ciphertext, Ciphertext1 *bfv.Ciphertext) (CiphertextAdd *bfv.Ciphertext) {
 	evaluator := bfv.NewEvaluator(params.params, rlwe.EvaluationKey{Rlk: params.rlk})
 	CiphertextAdd = evaluator.AddNew(Ciphertext0, Ciphertext1)
 	evaluator.Relinearize(CiphertextAdd, CiphertextAdd)
@@ -107,22 +79,14 @@ func (params *PublicParams) bfvAdd(Ciphertext0 *bfv.Ciphertext, Ciphertext1 *bfv
 }
 
 // 同态乘法
-func (params *PublicParams) bfvMult(Ciphertext0 *bfv.Ciphertext, Ciphertext1 *bfv.Ciphertext) (CiphertextMult *bfv.Ciphertext) {
+func (params *PublicParams) bfvMultru(Ciphertext0 *bfv.Ciphertext, Ciphertext1 *bfv.Ciphertext) (CiphertextMult *bfv.Ciphertext) {
 	evaluator := bfv.NewEvaluator(params.params, rlwe.EvaluationKey{Rlk: params.rlk})
 	CiphertextMult = evaluator.MulNew(Ciphertext0, Ciphertext1)
 	evaluator.Relinearize(CiphertextMult, CiphertextMult)
 	return
 }
 
-// 同态减法
-func (params *PublicParams) bfvSub(Ciphertext0 *bfv.Ciphertext, Ciphertext1 *bfv.Ciphertext) (CiphertextSub *bfv.Ciphertext) {
-	evaluator := bfv.NewEvaluator(params.params, rlwe.EvaluationKey{Rlk: params.rlk})
-	CiphertextSub = evaluator.SubNew(Ciphertext0, Ciphertext1)
-	evaluator.Relinearize(CiphertextSub, CiphertextSub)
-	return
-}
-
-func (params *PublicParams) eval1Phase(NGoRoutine int, encInputs []*bfv.Ciphertext) (encRes *bfv.Ciphertext) {
+func (params *PublicParams) eval1Phaseru(NGoRoutine int, encInputs []*bfv.Ciphertext) (encRes *bfv.Ciphertext) {
 
 	encLvls := make([][]*bfv.Ciphertext, 0)
 	encLvls = append(encLvls, encInputs)
@@ -177,7 +141,7 @@ func (params *PublicParams) eval1Phase(NGoRoutine int, encInputs []*bfv.Cipherte
 }
 
 // TODO: 开多个协程改写
-func (params *PublicParams) bfvDDec(Ciphertext *bfv.Ciphertext) (output []uint64) {
+func (params *PublicParams) bfvDDecru(Ciphertext *bfv.Ciphertext) (output []uint64) {
 	decryptor := bfv.NewDecryptor(params.params, params.tsk)
 	ptres := bfv.NewPlaintext(params.params)
 	decryptor.Decrypt(Ciphertext, ptres)
@@ -186,7 +150,7 @@ func (params *PublicParams) bfvDDec(Ciphertext *bfv.Ciphertext) (output []uint64
 }
 
 // TODO: 开多个协程改写
-func (params *PublicParams) keyswitch(ciphertextOld *bfv.Ciphertext, P []*party) (ciphertextNew *bfv.Ciphertext) {
+func (params *PublicParams) keyswitchru(ciphertextOld *bfv.Ciphertext, P []party) (ciphertextNew *bfv.Ciphertext) {
 	// Collective key switching from the collective secret key to
 	// the target public key
 	pcks := dbfv.NewPCKSProtocol(params.params, 3.19)
@@ -206,31 +170,34 @@ func (params *PublicParams) keyswitch(ciphertextOld *bfv.Ciphertext, P []*party)
 	return
 }
 
-func ckgphase(params bfv.Parameters, crs utils.PRNG, P []*party) *rlwe.PublicKey {
-
+func ckgphaseru(params bfv.Parameters, crs utils.PRNG, P []party) (pk *rlwe.PublicKey, Pnew []party) {
+	Pnew = P
 	ckg := dbfv.NewCKGProtocol(params) // Public key generation
 	ckgCombined := ckg.AllocateShares()
-	for _, pi := range P {
+	for _, pi := range Pnew {
 		pi.ckgShare = ckg.AllocateShares()
 	}
 	// 创建publickey的共享  p_i.sk * crp + e_i
 	crp := ckg.SampleCRP(crs)
-	for _, pi := range P {
-		ckg.GenShare(pi.sk, crp, pi.ckgShare)
+	for _, pi := range Pnew {
+		sk := new(rlwe.SecretKey)
+		ckgshare := new(drlwe.CKGShare)
+		ckg.GenShare(sk, crp, ckgshare)
+		pi.sk = sk
 	}
 
 	// 创建公钥b 将多方公钥的共享相加
-	pk := bfv.NewPublicKey(params)
+	pk = bfv.NewPublicKey(params)
 	for _, pi := range P {
 		ckg.AggregateShares(pi.ckgShare, ckgCombined, ckgCombined)
 	}
 	// 格式化公钥 a, b
 	ckg.GenPublicKey(ckgCombined, crp, pk)
 
-	return pk
+	return
 }
 
-func rkgphase(params bfv.Parameters, crs utils.PRNG, P []*party) *rlwe.RelinearizationKey {
+func rkgphaseru(params bfv.Parameters, crs utils.PRNG, P []party) *rlwe.RelinearizationKey {
 
 	rkg := dbfv.NewRKGProtocol(params) // Relineariation key generation
 	_, rkgCombined1, rkgCombined2 := rkg.AllocateShares()

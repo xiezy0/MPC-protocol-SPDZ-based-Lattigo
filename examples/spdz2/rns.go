@@ -115,6 +115,7 @@ func (params *rnsParams) crt(residuSlice []*big.Int) (res *big.Int) {
 		primesSliceDivInv = append(primesSliceDivInv, new(big.Int).ModInverse(primesSliceDiv[i], prime))
 	}
 	for i, primediv := range primesSliceDiv {
+		// todo :空地址问题》
 		mmi.Mul(primediv, primesSliceDivInv[i])
 		mmi.Mod(mmi, params.primeb)
 		xj = append(xj, new(big.Int).Mul(mmi, residuSlice[i]))
@@ -128,7 +129,7 @@ func (params *rnsParams) crt(residuSlice []*big.Int) (res *big.Int) {
 
 func genPrimeParamse(num int, sebit int) (primeBit, primeNum int) {
 	primeBit = evaPrimesBit(num)
-	primeNum = (sebit + primeBit - 1) * 2 / primeBit
+	primeNum = (sebit + primeBit - 1) * 3 / primeBit
 	return
 }
 
@@ -164,7 +165,7 @@ func genPrimeSlice(primeNumber int, primeBit int) (primeSlice []*big.Int, primeb
 // 根据计算方数量 计算每一个小素数的位数
 func evaPrimesBit(num int) (res int) {
 	lognum := math.Log2(float64(num))
-	res = 29 - int(lognum)
+	res = 19 - int(lognum)
 	return
 }
 

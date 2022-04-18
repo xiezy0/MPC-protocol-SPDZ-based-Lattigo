@@ -10,8 +10,6 @@ import (
 	"sync/atomic"
 )
 
-var ()
-
 // the public params of SPDZ
 type spdzParams struct {
 	rnsparams    rnsParams
@@ -30,29 +28,103 @@ func GenTriple(num int) {
 	rnsparams, fprime := spdzInit(num, 64)
 	publicparams, P := dkeyGen(num)
 	spdzparams := spdzParams{rnsparams, publicparams, fprime}
+	//wgmain, _, _, _ := encTxInit(num)
+	//wgmain1, _, _, _ := encTxInit(num)
 	wgmain, mutex, encch, queuelen := encTxInit(num)
+	wgmain1, mutex1, encch1, queuelen1 := encTxInit(num)
+	_, mutex2, encch2, queuelen2 := encTxInit(num)
+	wgmain3, mutex3, encch3, queuelen3 := encTxInit(num)
+	trilpAlpha, _ := rand.Int(rand.Reader, fprime)
+	ciphertextAlpha := publicparams.bfvEnc(encodeBigUintSlice(rnsparams.genResiduSlice(trilpAlpha)))
+	fmt.Println(trilpAlpha)
+	mutexSwitch := sync.Mutex{}
 	for i := 0; i < num; i++ {
 		skChan <- P[i]
 	}
+	//bigone  := new(big.Int).SetInt64(1)
+	//bigzero := new(big.Int).SetInt64(0)
 	// num goroutine <---> num players
 	for i := 0; i < num; i++ {
 		go func(params spdzParams, Id int, convSyncChan0 <-chan *party) {
-			trilpa, _ := rand.Int(rand.Reader, fprime)
-			//trilpb, _ := rand.Int(rand.Reader, fprime)
-			psk := <-convSyncChan0
-			fmt.Println(psk)
-			residuSliceA := encodeBigUintSlice(params.rnsparams.genResiduSlice(trilpa))
-			//residuSliceB := encodeBigUintSlice(params.rnsparams.genResiduSlice(trilpb))
-			ciphertext0 := publicparams.bfvEnc(residuSliceA)
-			//ciphertext1 := publicparams.bfvEnc(residuSliceB)
-			for j := 0; j < num; j++ {
-				ciphertext0Slice := encTx(&wgmain, &mutex, encch, Id, num, queuelen, ciphertext0)
-				fmt.Println(ciphertext0Slice)
+			trilpa, _ := rand.Int(rand.Reader, params.fprime)
+			trilpb, _ := rand.Int(rand.Reader, params.fprime)
+			f, _ := rand.Int(rand.Reader, params.fprime)
+			fmt.Println(f)
+			//psk := <-convSyncChan0
+			//fmt.Println(psk)
+			mutexSwitch.Lock()
+			ciphertexta := params.publicparams.bfvEnc(encodeBigUintSlice(params.rnsparams.genResiduSlice(trilpa)))
+			ciphertextb := params.publicparams.bfvEnc(encodeBigUintSlice(params.rnsparams.genResiduSlice(trilpb)))
+			ciphertextf := params.publicparams.bfvEnc(encodeBigUintSlice(params.rnsparams.genResiduSlice(f)))
+			mutexSwitch.Unlock()
+			//
+			ciphertextaSlice := encTx(&mutex, encch, Id, num, queuelen, ciphertexta)
+			ciphertextbSlice := encTx(&mutex1, encch1, Id, num, queuelen1, ciphertextb)
+			ciphertextfSlice := encTx(&mutex2, encch2, Id, num, queuelen2, ciphertextf)
+			// fmt.Println("goroutine", Id, ":", ciphertextaSlice, ciphertextbSlice)
+
+			ciphertextA := publicparams.eval1Phase(1, ciphertextaSlice)
+			ciphertextB := publicparams.eval1Phase(1, ciphertextbSlice)
+			ciphertextF := publicparams.eval1Phase(1, ciphertextfSlice)
+
+			ciphertextCold := publicparams.bfvMult(ciphertextA, ciphertextB)
+			ciphertextCShareold := publicparams.bfvAdd(ciphertextCold, ciphertextF)
+
+			mutexSwitch.Lock()
+			plaintextCshare := new(big.Int)
+			if Id == 0 {
+				ciphertextCshare := params.publicparams.keyswitch(publicparams.bfvSub(ciphertextCShareold, ciphertextf), P)
+				plaintextCshare = params.rnsparams.crt(decodeUintBigSlice(params.publicparams.bfvDDec(ciphertextCshare)))
+
+			} else {
+				plaintextCshare = f
 			}
+			mutexSwitch.Unlock()
+
+			wgmain1.Done()
+			wgmain1.Wait()
+
+			mutexSwitch.Lock()
+			fmt.Println("player", Id, "share C:", plaintextCshare)
+			bigzero := new(big.Int).SetInt64(0)
+			ciphertextcnew := params.publicparams.bfvEnc(encodeBigUintSlice(params.rnsparams.genResiduSlice(plaintextCshare)))
+			ciphertextCnew := params.publicparams.bfvEnc(encodeBigUintSlice(params.rnsparams.genResiduSlice(bigzero)))
+			mutexSwitch.Unlock()
+
+			ciphertextcSlice := encTx(&mutex3, encch3, Id, num, queuelen3, ciphertextcnew)
+			wgmain3.Done()
+			wgmain3.Wait()
+
+			for _, ciphertext := range ciphertextcSlice {
+				ciphertextCnew = publicparams.bfvAdd(ciphertextCnew, ciphertext)
+			}
+			ciphertextCnewAlpha := publicparams.bfvMult(ciphertextCnew, ciphertextAlpha)
+			ciphertextCnewAlphashare := publicparams.bfvAdd(ciphertextCnewAlpha, ciphertextF)
+
+			//39748363081423454926855472378417859248
+			//96392199965515998152829273534692535360
+			mutexSwitch.Lock()
+			plaintextCalphashare := new(big.Int)
+			if Id == 0 {
+				ciphertextswitch := publicparams.bfvSub(ciphertextCnewAlphashare, ciphertextf)
+				ciphertextAnew := params.publicparams.keyswitch(ciphertextswitch, P)
+				plaintextCalphashare = params.rnsparams.crt(decodeUintBigSlice(params.publicparams.bfvDDec(ciphertextAnew)))
+			} else {
+				plaintextCalphashare = f
+			}
+			fmt.Println("player", Id, "share C alpha:", plaintextCalphashare)
+			mutexSwitch.Unlock()
+
+			wgmain.Done()
 		}(spdzparams, i, skChan)
 	}
-	close(skChan)
+	fmt.Println(rnsparams.primeb)
+	// 4224251410346486574217241457275025533307997891809872903980948405892929
+	// 221045479695725508474707326942100346508 997525690921640950
 	wgmain.Wait()
+	close(skChan)
+	//time.Sleep(time.Second * 4)  3343168732
+
 }
 
 func encTxInit(players int) (wgmain sync.WaitGroup, mutex sync.Mutex, ch chan *bfv.Ciphertext, queuelen uint64) {
@@ -64,10 +136,8 @@ func encTxInit(players int) (wgmain sync.WaitGroup, mutex sync.Mutex, ch chan *b
 	return
 }
 
-func encTx(wgmain *sync.WaitGroup, mutex *sync.Mutex, ch chan *bfv.Ciphertext, num int, players int, queuelen uint64, enc *bfv.Ciphertext) (m []*bfv.Ciphertext) {
+func encTx(mutex *sync.Mutex, ch chan *bfv.Ciphertext, num int, players int, queuelen uint64, enc *bfv.Ciphertext) (m []*bfv.Ciphertext) {
 	m = make([]*bfv.Ciphertext, players)
-	wg := sync.WaitGroup{}
-	wg.Add(players)
 	ch <- enc
 LABEL:
 	mutex.Lock()
@@ -75,18 +145,14 @@ LABEL:
 		for j := 0; j < players; j++ {
 			m[j] = <-ch
 		}
-		fmt.Println("goroutine", num, ":", m)
-		wg.Done()
 		for j := 0; j < players; j++ {
 			ch <- m[j]
 		}
-		wgmain.Done()
 		mutex.Unlock()
 	} else {
 		mutex.Unlock()
 		goto LABEL
 	}
-	wg.Wait()
 	return
 }
 
@@ -100,12 +166,10 @@ func genTriple(num int) {
 	fmt.Println("trilpB", trilpB)
 
 	params := rnsInit(num, []*big.Int{trilpA, trilpB})
-	residuSliceA := encodeBigUintSlice(params.genResiduSlice(trilpA))
-	residuSliceB := encodeBigUintSlice(params.genResiduSlice(trilpB))
 
 	publicparams, P := dkeyGen(num)
-	ciphertext0 := publicparams.bfvEnc(residuSliceA)
-	ciphertext1 := publicparams.bfvEnc(residuSliceB)
+	ciphertext0 := publicparams.bfvEnc(encodeBigUintSlice(params.genResiduSlice(trilpA)))
+	ciphertext1 := publicparams.bfvEnc(encodeBigUintSlice(params.genResiduSlice(trilpB)))
 	ciphertext2 := publicparams.bfvAdd(ciphertext0, ciphertext1)
 	ciphertext3 := publicparams.bfvMult(ciphertext0, ciphertext1)
 	ciphertext2New := publicparams.keyswitch(ciphertext2, P)
