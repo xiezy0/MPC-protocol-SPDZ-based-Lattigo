@@ -7,8 +7,8 @@ import (
 )
 
 func TestRnsgen(t *testing.T) {
-	n0, _ := new(big.Int).SetString("10000000000000000000000000000000000000000000000000", 10)
-	n1, _ := new(big.Int).SetString("10000000000000000000000000000000000000000000000000", 10)
+	n0, _ := new(big.Int).SetString("fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff", 16)
+	n1, _ := new(big.Int).SetString("fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff", 16)
 	fmt.Println("n0:::::::", n0)
 	fmt.Println("n1:::::::", n1)
 	params := rnsInit(2, []*big.Int{n0, n1})

@@ -43,7 +43,7 @@ func TestSpdz(t *testing.T) {
 		fmt.Println("tripleAaBevalu", res0)
 	})
 	t.Run("numgoroutine", func(t *testing.T) {
-		GenTriple(3)
+		GenTriple(5, 2048)
 	})
 	t.Run("numgoroutinechann", func(t *testing.T) {
 		skChan := make(chan *party, 3)

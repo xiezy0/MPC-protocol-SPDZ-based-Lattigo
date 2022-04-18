@@ -115,7 +115,6 @@ func (params *rnsParams) crt(residuSlice []*big.Int) (res *big.Int) {
 		primesSliceDivInv = append(primesSliceDivInv, new(big.Int).ModInverse(primesSliceDiv[i], prime))
 	}
 	for i, primediv := range primesSliceDiv {
-		// todo :空地址问题》
 		mmi.Mul(primediv, primesSliceDivInv[i])
 		mmi.Mod(mmi, params.primeb)
 		xj = append(xj, new(big.Int).Mul(mmi, residuSlice[i]))
@@ -172,7 +171,7 @@ func evaPrimesBit(num int) (res int) {
 // 元素item是否在切片items中
 func InSlice(items []*big.Int, item *big.Int) bool {
 	for _, eachItem := range items {
-		if eachItem == item {
+		if eachItem.Cmp(item) == 0 {
 			return true
 		}
 	}

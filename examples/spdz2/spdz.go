@@ -35,9 +35,9 @@ func spdzInit(num int, security int) (params rnsParams, fprime *big.Int, wgmain 
 	return
 }
 
-func GenTriple(num int) {
+func GenTriple(num int, security int) {
 	skChan := make(chan *party, num)
-	rnsparams, fprime, wgmain := spdzInit(num, 64)
+	rnsparams, fprime, wgmain := spdzInit(num, security)
 	publicparams, P := dkeyGen(num)
 	spdzparams := spdzParams{rnsparams, publicparams, fprime}
 	txparams := encTxInitMul(num, 7)
@@ -48,8 +48,6 @@ func GenTriple(num int) {
 	for i := 0; i < num; i++ {
 		skChan <- P[i]
 	}
-	//bigone  := new(big.Int).SetInt64(1)
-	//bigzero := new(big.Int).SetInt64(0)
 	// num goroutine <---> num players
 	for i := 0; i < num; i++ {
 		go func(params spdzParams, Id int, convSyncChan0 <-chan *party) {
@@ -73,16 +71,16 @@ func GenTriple(num int) {
 			// step 5
 			AlphaAshare := params.PAngle(ciphertextA, ciphertextAlpha, &mutexSwitch, txparams[2], Id, num, P)
 			AlphaBshare := params.PAngle(ciphertextB, ciphertextAlpha, &mutexSwitch, txparams[3], Id, num, P)
-			fmt.Println("player", Id, "share A*Δ:", AlphaAshare)
-			fmt.Println("player", Id, "share B*Δ:", AlphaBshare)
+			fmt.Println("player", Id+1, "share A*Δ:", AlphaAshare)
+			fmt.Println("player", Id+1, "share B*Δ:", AlphaBshare)
 			// step 6
 			ciphertextCold := publicparams.bfvMult(ciphertextA, ciphertextB)
 			// step 7
 			Cshare, ciphertextCnew := params.Reshare(&mutexSwitch, txparams[4], txparams[5], ciphertextCold, Id, num, P, true)
-			fmt.Println("player", Id, "share C:", Cshare)
+			fmt.Println("player", Id+1, "share C:", Cshare)
 			// step 8
 			AlphaCshare := params.PAngle(ciphertextCnew, ciphertextAlpha, &mutexSwitch, txparams[6], Id, num, P)
-			fmt.Println("player", Id, "share C*Δ:", AlphaCshare)
+			fmt.Println("player", Id+1, "share C*Δ:", AlphaCshare)
 
 			wgmain.Done()
 		}(spdzparams, i, skChan)
