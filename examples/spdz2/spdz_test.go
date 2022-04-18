@@ -16,7 +16,7 @@ func TestSpdz(t *testing.T) {
 		genTriple(2)
 	})
 	t.Run("1goroutinespdz", func(t *testing.T) {
-		params, fprime := spdzInit(2, 64)
+		params, fprime, _ := spdzInit(2, 64)
 		trilpA, _ := rand.Int(rand.Reader, fprime)
 		trilpB, _ := rand.Int(rand.Reader, fprime)
 		tripleCright := new(big.Int).Mul(trilpA, trilpB)
@@ -47,9 +47,8 @@ func TestSpdz(t *testing.T) {
 	})
 	t.Run("numgoroutinechann", func(t *testing.T) {
 		skChan := make(chan *party, 3)
-		rnsparams, fprime := spdzInit(3, 32)
+		rnsparams, fprime, wgmain := spdzInit(3, 32)
 		publicparams, P := dkeyGen(3)
-		wgmain, _ := encTxInit(3)
 		mutex := sync.Mutex{}
 		//trilpa, _ := rand.Int(rand.Reader, fprime)
 		//ciphertexta := publicparams.bfvEnc(encodeBigUintSlice(rnsparams.genResiduSlice(trilpa)))

@@ -27,24 +27,20 @@ type spdzParams struct {
 	fprime       *big.Int
 }
 
-func spdzInit(num int, security int) (params rnsParams, fprime *big.Int) {
+func spdzInit(num int, security int) (params rnsParams, fprime *big.Int, wgmain sync.WaitGroup) {
 	params = rnspdzInit(num, security)
 	fprime, _ = rand.Prime(rand.Reader, security)
+	wgmain = sync.WaitGroup{}
+	wgmain.Add(num)
 	return
 }
 
 func GenTriple(num int) {
 	skChan := make(chan *party, num)
-	rnsparams, fprime := spdzInit(num, 64)
+	rnsparams, fprime, wgmain := spdzInit(num, 64)
 	publicparams, P := dkeyGen(num)
 	spdzparams := spdzParams{rnsparams, publicparams, fprime}
-	wgmain, txparams0 := encTxInit(num)
-	_, txparams1 := encTxInit(num)
-	_, txparams2 := encTxInit(num)
-	_, txparams3 := encTxInit(num)
-	_, txparams4 := encTxInit(num)
-	_, txparams5 := encTxInit(num)
-	_, txparams6 := encTxInit(num)
+	txparams := encTxInitMul(num, 7)
 	trilpAlpha, _ := rand.Int(rand.Reader, fprime)
 	ciphertextAlpha := publicparams.bfvEnc(encodeBigUintSlice(rnsparams.genResiduSlice(trilpAlpha)))
 	fmt.Println("alpha", trilpAlpha)
@@ -69,23 +65,23 @@ func GenTriple(num int) {
 			mutexSwitch.Unlock()
 			//txparams0 := TxParams{&mutex0, encch0, queuelen0}
 			//txparams1 := TxParams{&mutex1, encch1, queuelen1}
-			ciphertextaSlice := txparams0.encTx(num, ciphertexta)
-			ciphertextbSlice := txparams1.encTx(num, ciphertextb)
+			ciphertextaSlice := txparams[0].encTx(num, ciphertexta)
+			ciphertextbSlice := txparams[1].encTx(num, ciphertextb)
 			// step 3&4
 			ciphertextA := params.AddSlice(ciphertextaSlice, &mutexSwitch)
 			ciphertextB := params.AddSlice(ciphertextbSlice, &mutexSwitch)
 			// step 5
-			AlphaAshare := params.PAngle(ciphertextA, ciphertextAlpha, &mutexSwitch, txparams2, Id, num, P)
-			AlphaBshare := params.PAngle(ciphertextB, ciphertextAlpha, &mutexSwitch, txparams3, Id, num, P)
+			AlphaAshare := params.PAngle(ciphertextA, ciphertextAlpha, &mutexSwitch, txparams[2], Id, num, P)
+			AlphaBshare := params.PAngle(ciphertextB, ciphertextAlpha, &mutexSwitch, txparams[3], Id, num, P)
 			fmt.Println("player", Id, "share A*Δ:", AlphaAshare)
 			fmt.Println("player", Id, "share B*Δ:", AlphaBshare)
 			// step 6
 			ciphertextCold := publicparams.bfvMult(ciphertextA, ciphertextB)
 			// step 7
-			Cshare, ciphertextCnew := params.Reshare(&mutexSwitch, txparams4, txparams5, ciphertextCold, Id, num, P, true)
+			Cshare, ciphertextCnew := params.Reshare(&mutexSwitch, txparams[4], txparams[5], ciphertextCold, Id, num, P, true)
 			fmt.Println("player", Id, "share C:", Cshare)
 			// step 8
-			AlphaCshare := params.PAngle(ciphertextCnew, ciphertextAlpha, &mutexSwitch, txparams6, Id, num, P)
+			AlphaCshare := params.PAngle(ciphertextCnew, ciphertextAlpha, &mutexSwitch, txparams[6], Id, num, P)
 			fmt.Println("player", Id, "share C*Δ:", AlphaCshare)
 
 			wgmain.Done()

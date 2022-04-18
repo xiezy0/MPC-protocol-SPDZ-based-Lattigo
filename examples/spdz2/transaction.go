@@ -16,9 +16,15 @@ type TxParams struct {
 	queuelen uint64
 }
 
-func encTxInit(players int) (wgmain sync.WaitGroup, txparams TxParams) {
-	wgmain = sync.WaitGroup{}
-	wgmain.Add(players)
+func encTxInitMul(players int, gennum int) (txparams []TxParams) {
+	txparams = make([]TxParams, 0)
+	for i := 0; i < gennum; i++ {
+		txparams = append(txparams, encTxInit(players))
+	}
+	return
+}
+
+func encTxInit(players int) (txparams TxParams) {
 	mutex := sync.Mutex{}
 	ch := make(chan *bfv.Ciphertext, players)
 	queuelen := uint64(0)
