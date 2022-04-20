@@ -50,13 +50,6 @@ func TestSpdz(t *testing.T) {
 		rnsparams, fprime, wgmain := spdzInit(3, 32)
 		publicparams, P := dkeyGen(3)
 		mutex := sync.Mutex{}
-		//trilpa, _ := rand.Int(rand.Reader, fprime)
-		//ciphertexta := publicparams.bfvEnc(encodeBigUintSlice(rnsparams.genResiduSlice(trilpa)))
-		//ciphertextAnew := publicparams.keyswitch(ciphertexta, P)
-		//plaintext1 := publicparams.bfvDDec(ciphertextAnew)
-		//ppp0 := rnsparams.crt(decodeUintBigSlice(plaintext1))
-		//fmt.Println(trilpa)
-		//fmt.Println(ppp0)
 		for i := 0; i < 3; i++ {
 			go func(Id int) {
 				trilpa, _ := rand.Int(rand.Reader, fprime)

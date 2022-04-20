@@ -66,9 +66,21 @@ func TestEncode(t *testing.T) {
 		encodevalue0 := Encode1(value0Slice, 32)
 		encodevalue1 := Encode1(value1Slice, 32)
 		// TODO: 增加二级解码的mod数选取
-		decodemultSlice := Decode2(new(big.Int).Mul(encodevalue0, encodevalue1), 8, 32)
+		decodemultSlice := Decode2Mult(new(big.Int).Mul(encodevalue0, encodevalue1), 8, 32)
 		fmt.Println("multright:", valueSliceMultRight)
 		fmt.Println("multevalu:", decodemultSlice)
+	})
+	t.Run("testploy", func(t *testing.T) {
+		ploy0 := []*big.Int{new(big.Int).SetInt64(1), new(big.Int).SetInt64(2), new(big.Int).SetInt64(3)}
+		ploy1 := []*big.Int{new(big.Int).SetInt64(1), new(big.Int).SetInt64(2), new(big.Int).SetInt64(3)}
+		ployres := ploymult(ploy0, ploy1)
+		fmt.Println(ployres)
+	})
+	t.Run("testploysame", func(t *testing.T) {
+		ploy0 := []*big.Int{new(big.Int).SetInt64(1), new(big.Int).SetInt64(2), new(big.Int).SetInt64(6)}
+		ploy1 := []*big.Int{new(big.Int).SetInt64(1), new(big.Int).SetInt64(2), new(big.Int).SetInt64(6)}
+		ployres := ploymultsame(ploy0, ploy1)
+		fmt.Println(ployres)
 	})
 
 }
