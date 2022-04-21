@@ -164,7 +164,8 @@ func genPrimeSlice(primeNumber int, primeBit int) (primeSlice []*big.Int, primeb
 // 根据计算方数量 计算每一个小素数的位数
 func evaPrimesBit(num int) (res int) {
 	lognum := math.Log2(float64(num))
-	res = 19 - int(lognum)
+	res = 28 - int(lognum)
+	//	res = 29 -
 	return
 }
 

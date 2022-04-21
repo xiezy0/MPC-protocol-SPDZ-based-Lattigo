@@ -10,7 +10,9 @@ func Encode1(valueSlice []*big.Int, m int) (encodeValue *big.Int) {
 	encodeValue = new(big.Int).SetUint64(0)
 	for i, value := range valueSlice {
 		// 2^(i-1) - 1
-		exp2i_1_1 := new(big.Int).SetInt64(int64(math.Exp2(float64(i)) - 1))
+		exp2i_1_1 := new(big.Int).Exp(new(big.Int).SetInt64(2), new(big.Int).SetInt64(int64(i)), nil)
+		exp2i_1_1.Add(exp2i_1_1, new(big.Int).Neg(new(big.Int).SetInt64(1)))
+		// exp2i_1_1 := new(big.Int).SetInt64(int64(math.Exp2(float64(i)) - 1))
 		// d = m + log2(num) + 1
 		d := m + int(math.Log2(float64(num))) + 1
 		// k = d + m

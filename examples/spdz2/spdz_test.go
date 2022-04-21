@@ -16,7 +16,7 @@ func TestSpdz(t *testing.T) {
 		genTriple(2)
 	})
 	t.Run("1goroutinespdz", func(t *testing.T) {
-		params, fprime, _ := spdzInit(2, 64)
+		params, fprime, _ := spdzInit(8, 128)
 		trilpA, _ := rand.Int(rand.Reader, fprime)
 		trilpB, _ := rand.Int(rand.Reader, fprime)
 		tripleCright := new(big.Int).Mul(trilpA, trilpB)
@@ -43,7 +43,7 @@ func TestSpdz(t *testing.T) {
 		fmt.Println("tripleAaBevalu", res0)
 	})
 	t.Run("numgoroutine", func(t *testing.T) {
-		GenTriple(16, 2048)
+		GenTriple(8, 64)
 	})
 	t.Run("numgoroutinechann", func(t *testing.T) {
 		skChan := make(chan *party, 3)
